@@ -1,5 +1,5 @@
 # ignore everything
-
+*
 # allow git to recurse into directories
 !*/
 
