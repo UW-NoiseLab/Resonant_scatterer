@@ -1,0 +1,7 @@
+# ignore everything
+
+# allow git to recurse into directories
+!*/
+
+# keep python files
+!*.py
