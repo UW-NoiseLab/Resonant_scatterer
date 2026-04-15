@@ -21,16 +21,13 @@ LSF_FSP_FILE = r"./Grating_simulation.fsp"
 
 
 # 输出根目录
-OUTPUT_ROOT = Path("automated_grating_results")
+OUTPUT_ROOT = Path("./automated_grating_results")
 
-# monitor names
-# FIELD_MONITOR_NAME = "monitor"       # 用来取 E
-# TRANS_MONITOR_NAME = "monitor"     # 用来取 transmission / reflectance
 
 # 是否隐藏 Lumerical GUI
 HIDE_LUMERICAL = False
 
-grating_wavelength = 0.533e-6
+grating_wavelength_nm = 533.0
 
 scatterer_data_folder = Path("./automated_result_glass_3/automated_sweep_results_r107nm_p322nm")
 
@@ -52,7 +49,6 @@ def load_scatterer_config_and_data(data_folder, target_wavelength_nm=533.0):
     # Find the index closest to target wavelength
     wl_idx = np.argmin(np.abs(wave_nm - target_wavelength_nm))
     actual_wl_nm = wave_nm[wl_idx]
-    actual_wl_m = actual_wl_nm * 1e-9
     
     print(f"Target wavelength: {target_wavelength_nm} nm")
     print(f"Actual wavelength used: {actual_wl_nm} nm")
@@ -103,7 +99,9 @@ def save_lsf_file(lsf_content, output_file):
 
 # Load scatterer data and generate LSF file at 533nm
 if __name__ == "__main__":
-    result = load_scatterer_config_and_data(scatterer_data_folder, target_wavelength_nm=533.0)
+    ensure_dir(OUTPUT_ROOT)
+    
+    result = load_scatterer_config_and_data(scatterer_data_folder, target_wavelength_nm=grating_wavelength_nm)
     
     
     # Save the generated LSF content
@@ -115,6 +113,14 @@ if __name__ == "__main__":
     print(f"  LC Index values: {len(result['lc_index_data'])} points")
     print(f"  LC Phase data: {len(result['lc_phase_data'])} points")
     
+    plt.figure(figsize=(6, 4))
+    plt.plot(result["lc_index_data"], (np.array(result["lc_phase_data"]) - np.array(result["lc_phase_data"][0])) % (2*np.pi), marker='o')
+    plt.xlabel("LC Refractive Index")
+    plt.ylabel("Phase Delay (rad)")
+    plt.title(f"LC Phase vs Index at {result['target_wavelength_nm']} nm")
+    plt.grid(True)
+    plt.savefig(os.path.join(OUTPUT_ROOT, f"lc_phase_vs_index_{int(result['target_wavelength_nm'])}nm.png"), dpi=300)
+    print(f"Lookup table plot saved to: {os.path.abspath(os.path.join(OUTPUT_ROOT, f'lc_phase_vs_index_{int(result["target_wavelength_nm"])}nm.png'))}")
     
     fdtd = lumapi.FDTD(hide=HIDE_LUMERICAL)
     
