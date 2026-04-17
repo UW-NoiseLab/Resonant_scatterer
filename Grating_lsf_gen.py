@@ -1,4 +1,44 @@
+import numpy as np
+from typing import Literal, Union
 
+_SCATTERER_SCHEMES = {
+    "SiN on Top": {
+        "label": "SiN",
+        "material": "Si3N4 (Silicon Nitride) - Phillip",
+        "patch_name": "SiN_patch_",
+        "group_name": "SiN_patches",
+        "position_comment": "directly below ITO",
+        "z_position": """scatter_z_max = ITO_z_min;
+scatter_z_min = scatter_z_max - __T_SCATTER__;""",
+    },
+    "SiN on Bottom": {
+        "label": "SiN",
+        "material": "Si3N4 (Silicon Nitride) - Phillip",
+        "patch_name": "SiN_patch_",
+        "group_name": "SiN_patches",
+        "position_comment": "directly above spacer SiO2",
+        "z_position": """scatter_z_min = spacer_z_max;
+scatter_z_max = scatter_z_min + __T_SCATTER__;""",
+    },
+    "TiO2 on Top": {
+        "label": "TiO2",
+        "material": "TiO2 (Titanium Dioxide) - Siefke",
+        "patch_name": "TiO2_patch_",
+        "group_name": "TiO2_patches",
+        "position_comment": "directly below ITO",
+        "z_position": """scatter_z_max = ITO_z_min;
+scatter_z_min = scatter_z_max - __T_SCATTER__;""",
+    },
+    "TiO2 on Bottom": {
+        "label": "TiO2",
+        "material": "TiO2 (Titanium Dioxide) - Siefke",
+        "patch_name": "TiO2_patch_",
+        "group_name": "TiO2_patches",
+        "position_comment": "directly above spacer SiO2",
+        "z_position": """scatter_z_min = spacer_z_max;
+scatter_z_max = scatter_z_min + __T_SCATTER__;""",
+    },
+}
 
 def grating_lsf_gen(
     period,
@@ -14,6 +54,7 @@ def grating_lsf_gen(
     
     LC_index_data,
     LC_phase_data,
+    scheme: Union[Literal["SiN on Top", "SiN on Bottom", "TiO2 on Top", "TiO2 on Bottom"], None] = None,
 ):
     '''
     Generate LSF content for the grating structure based on the provided parameters and lookup tables.
@@ -80,9 +121,8 @@ glass_z_min = ITO_z_max;
 glass_z_max = glass_z_min + __T_GLASS__;
 glass_z_center = 0.5*(glass_z_min + glass_z_max);
 
-# Si3N4 cylindrical scatterer, directly below ITO
-scatter_z_max = ITO_z_min;
-scatter_z_min = scatter_z_max - __T_SCATTER__;
+# __SCATTER_LABEL__ cylindrical scatterer, __SCATTER_POSITION_COMMENT__
+__SCATTER_Z_POSITION__
 scatter_z_center = 0.5*(scatter_z_min + scatter_z_max);
 
 # FDTD margins
@@ -90,7 +130,7 @@ z_margin_bottom = 0.3e-6;
 z_margin_top = 0.3e-6;
 
 fdtd_z_min = Al_z_min - 0.3e-6;
-fdtd_z_max = glass_z_min + 0.8e-6;
+fdtd_z_max = glass_z_min + 2.0e-6;
 
 ############################################
 # SUBSTRATE
@@ -243,13 +283,13 @@ for(i=1:M){
     #addtogroup("Oxide_patches");
 
     ####################################
-    # SiN metasurface cylinder
+    # __SCATTER_LABEL__ metasurface cylinder
     ####################################
 
     addcircle;
-    set("name","SiN_patch_"+num2str(i));
+    set("name","__SCATTER_PATCH_NAME__"+num2str(i));
 
-    set("material","Si3N4 (Silicon Nitride) - Phillip");
+    set("material","__SCATTER_MATERIAL__");
 
     set("x",xpos);
     set("y",0);
@@ -258,7 +298,7 @@ for(i=1:M){
 
     set("z min",scatter_z_min);
     set("z max",scatter_z_max);
-    #addtogroup("TiO2_patches");
+    #addtogroup("__SCATTER_GROUP_NAME__");
 
 }
 
@@ -279,7 +319,7 @@ set("y",0);      # added
 set("x span",Lx);
 set("y span",Ly);
 
-set("z",glass_z_min + 0.3e-6);
+set("z",glass_z_min + 0.5e-6);
 
 set("wavelength start",wavelength-wl_span/2);
 set("wavelength stop",wavelength+wl_span/2);
@@ -303,7 +343,7 @@ set("y",0);      # added
 set("x span",Lx);
 set("y span",Ly);
 
-set("z", glass_z_min + 0.10e-6);
+set("z", glass_z_min + 1.0e-6);
 
 set("override global monitor settings",1);
 set("frequency points",200);
@@ -378,6 +418,18 @@ set("x span",Lx);
 }
 """
 
+    if scheme is None:
+        scheme = "SiN on Top"
+
+    if scheme not in _SCATTERER_SCHEMES:
+        valid_schemes = ", ".join(_SCATTERER_SCHEMES)
+        raise ValueError(f"Unknown scatterer scheme '{scheme}'. Valid schemes: {valid_schemes}")
+
+    scheme_config = _SCATTERER_SCHEMES[scheme]
+
+    assert len(LC_index_data) == len(LC_phase_data), "LC_index_data and LC_phase_data must have the same length."
+    assert np.all(np.diff(np.array(LC_phase_data)) > 0), f"LC_phase_data must be strictly increasing. Got: {LC_phase_data}"
+
     LC_index_data = [float(x) for x in LC_index_data]
     LC_phase_data = [float(x) for x in LC_phase_data]
     # index_data_str = ",\n    ".join(f"{x:.16g}" for x in LC_index_data)
@@ -387,7 +439,8 @@ set("x span",Lx);
 
     phase_data_str = "[\n    " + ",\n    ".join(f"{x:.16g}" for x in LC_phase_data) + "\n]"
     
-    template = template.replace("__PERIOD__", f"{period:.16g}") \
+    template = template.replace("__SCATTER_Z_POSITION__", scheme_config["z_position"]) \
+            .replace("__PERIOD__", f"{period:.16g}") \
             .replace("__T_AL__", f"{t_Al:.16g}") \
             .replace("__T_SPACER__", f"{t_spacer:.16g}") \
             .replace("__T_LC__", f"{t_LC:.16g}") \
@@ -399,6 +452,10 @@ set("x span",Lx);
             .replace("__LAMBDA_SPAN__", f"{lambda_span:.16g}") \
             .replace("__LC_INDEX_DATA__", index_data_str) \
             .replace("__LC_PHASE_DATA__", phase_data_str) \
+            .replace("__SCATTER_LABEL__", scheme_config["label"]) \
+            .replace("__SCATTER_MATERIAL__", scheme_config["material"]) \
+            .replace("__SCATTER_PATCH_NAME__", scheme_config["patch_name"]) \
+            .replace("__SCATTER_GROUP_NAME__", scheme_config["group_name"]) \
+            .replace("__SCATTER_POSITION_COMMENT__", scheme_config["position_comment"]) \
 
     return template
-

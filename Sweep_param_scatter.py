@@ -14,6 +14,7 @@ from Utils import (
     try_get_transmission,
     plot_summary_figures,
 )
+from Scatterer_lsf_gen import scatterer_lsf_gen
 
 
 # =========================================================
@@ -21,7 +22,6 @@ from Utils import (
 # =========================================================
 
 # Lumerical function 脚本
-LSF_FUNCTION_FILE = r"./create_scatterer.lsf"
 
 # 预先建好的 fsp 模型
 LSF_FSP_FILE = r"./LC_simulation.fsp"
@@ -32,6 +32,11 @@ OUTPUT_ROOT = Path("automated_sweep_results")
 # monitor names
 FIELD_MONITOR_NAME = "monitor"       # 用来取 E
 TRANS_MONITOR_NAME = "monitor"     # 用来取 transmission / reflectance
+
+# Scatterer scheme: "SiN on Top" or "SiN on Bottom" or "TiO2 on Top" or "TiO2 on Bottom"
+SCATTERER_SCHEME = "TiO2 on Top"
+SCATTERER_SCHEME_CHOICES = ("SiN on Top", "SiN on Bottom", "TiO2 on Top", "TiO2 on Bottom")
+
 
 # 是否隐藏 Lumerical GUI
 HIDE_LUMERICAL = True
@@ -63,7 +68,6 @@ MAX_RETRY = 6
 
 
 def run_sweep(
-    lsf_function_file=LSF_FUNCTION_FILE,
     lsf_fsp_file=LSF_FSP_FILE,
     output_root=OUTPUT_ROOT,
     field_monitor_name=FIELD_MONITOR_NAME,
@@ -82,10 +86,11 @@ def run_sweep(
     index_values=None,
     num_wave=num_wave,
     max_retry=MAX_RETRY,
+    only_create_model=False,
+    scatterer_scheme=SCATTERER_SCHEME,
 ):
     """Run the LC index sweep with configurable parameters."""
     output_root = Path(output_root)
-    lsf_function_file = Path(lsf_function_file)
     lsf_fsp_file = Path(lsf_fsp_file)
 
     if index_values is None:
@@ -98,7 +103,6 @@ def run_sweep(
 
     ensure_dir(output_root)
     config = {
-        "lsf_function_file": str(lsf_function_file),
         "lsf_fsp_file": str(lsf_fsp_file),
         "output_root": str(output_root),
         "field_monitor_name": field_monitor_name,
@@ -112,6 +116,7 @@ def run_sweep(
         "t_glass": float(t_glass),
         "r_scatter": float(r_scatter),
         "t_scatter": float(t_scatter),
+        "scatterer_scheme": scatterer_scheme,
         "lambda_start": float(lambda_start),
         "lambda_stop": float(lambda_stop),
         "index_values": index_values.tolist(),
@@ -135,14 +140,10 @@ def run_sweep(
             raise FileNotFoundError(f"FSP file NOT found: {lsf_fsp_file}")
         fdtd.load(str(lsf_fsp_file))
 
-        if not os.path.isfile(lsf_function_file):
-            raise FileNotFoundError(f"LSF file NOT found: {lsf_function_file}")
-
-        with open(lsf_function_file, "r", encoding="utf-8") as f:
-            lsf_code = f.read()
+        lsf_code = scatterer_lsf_gen(scatterer_scheme)
 
         if len(lsf_code.strip()) == 0:
-            raise ValueError(f"LSF file is empty: {lsf_function_file}")
+            raise ValueError(f"LSF code has error: {lsf_code}")
 
         print(f"[DEBUG] Successfully read LSF file ({len(lsf_code)} characters)")
         fdtd.eval(lsf_code)
@@ -150,6 +151,7 @@ def run_sweep(
         fdtd.switchtolayout()
         fdtd.eval(f'setglobalmonitor("frequency points",{num_wave});')
         print(f"[DEBUG] Set global monitor frequency points to {num_wave}")
+        
 
         for i, lc_index in enumerate(index_values):
             print(f"[{i+1}/{n_index}] Running LC index = {lc_index:.3f}")
@@ -179,6 +181,11 @@ def run_sweep(
 
                     fdtd.select("liquid_crystal")
                     fdtd.set("index", float(lc_index))
+                    
+                    if only_create_model:
+                        print("Only creating model, skipping simulation.")
+                        time.sleep(2000.0)
+                        return
 
                     time.sleep(1.0)
                     fdtd.run()
@@ -258,6 +265,12 @@ def main():
     parser.add_argument("--index-stop", type=float, default=1.75, help="Stop LC index")
     parser.add_argument("--index-step", type=float, default=0.01, help="Step size for LC index")
     parser.add_argument("--hide-gui", action="store_false", help="Hide Lumerical GUI")
+    parser.add_argument(
+        "--scatterer-scheme",
+        default=SCATTERER_SCHEME,
+        choices=SCATTERER_SCHEME_CHOICES,
+        help="Scatterer material and z-placement scheme",
+    )
     args = parser.parse_args()
     
     # r_scatter_list = [0.08e-6, 0.10e-6, 0.12e-6, 0.14e-6, 0.16e-6]
@@ -287,7 +300,8 @@ def main():
     #     )
     
     # period_list = [0.25e-6, 0.26e-6, 0.27e-6, 0.28e-6, 0.29e-6, 0.30e-6, 0.31e-6, 0.32e-6, 0.33e-6, 0.34e-6, 0.35e-6, 0.36e-6, 0.37e-6, 0.38e-6]
-    period_list = [0.322e-6, 0.324e-6, 0.326e-6, 0.328e-6, 0.33e-6]
+    # period_list = [0.322e-6, 0.324e-6, 0.326e-6, 0.328e-6, 0.33e-6]
+    period_list = [0.34e-6]
     r_scatter_list = [0.12/0.36*p for p in period_list]
     output_root_list = [f"./automated_result_glass_0.3/{OUTPUT_ROOT}_r{int(r*1e9)}nm_p{int(p*1e9)}nm" for r, p in zip(r_scatter_list, period_list)]
 
@@ -303,6 +317,8 @@ def main():
             num_wave=args.num_wave,
             max_retry=args.max_retry,
             index_values=np.arange(args.index_start, args.index_stop + 1e-12, args.index_step),
+            only_create_model=True,
+            scatterer_scheme=args.scatterer_scheme,
         )
         
 if __name__ == "__main__":
