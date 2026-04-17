@@ -1,18 +1,19 @@
-import json
 import os
-import sys
 import time
 from pathlib import Path
 
 import numpy as np
-import matplotlib.pyplot as plt
 import lumapi
 from Utils import (
+    build_scatterer_output_dir,
     ensure_dir,
     extract_complex_field_from_monitor,
     average_phase_over_xy,
     try_get_transmission,
     plot_summary_figures,
+    hash_from_namespace,
+    save_json,
+    stable_config_hash,
 )
 from Scatterer_lsf_gen import scatterer_lsf_gen
 
@@ -26,8 +27,8 @@ from Scatterer_lsf_gen import scatterer_lsf_gen
 # 预先建好的 fsp 模型
 LSF_FSP_FILE = r"./LC_simulation.fsp"
 
-# 输出根目录
-OUTPUT_ROOT = Path("automated_sweep_results")
+# Scatterer sweeps default to output/scatterer_datas/{scheme}_p{period}_r{radius}_{hash}.
+OUTPUT_BASE = Path("output/scatterer_datas")
 
 # monitor names
 FIELD_MONITOR_NAME = "monitor"       # 用来取 E
@@ -69,7 +70,8 @@ MAX_RETRY = 6
 
 def run_sweep(
     lsf_fsp_file=LSF_FSP_FILE,
-    output_root=OUTPUT_ROOT,
+    output_root=None,
+    output_base=OUTPUT_BASE,
     field_monitor_name=FIELD_MONITOR_NAME,
     trans_monitor_name=TRANS_MONITOR_NAME,
     hide_lumerical=HIDE_LUMERICAL,
@@ -90,7 +92,6 @@ def run_sweep(
     scatterer_scheme=SCATTERER_SCHEME,
 ):
     """Run the LC index sweep with configurable parameters."""
-    output_root = Path(output_root)
     lsf_fsp_file = Path(lsf_fsp_file)
 
     if index_values is None:
@@ -101,10 +102,8 @@ def run_sweep(
     n_index = len(index_values)
     n_wave = len(wave_nm)
 
-    ensure_dir(output_root)
-    config = {
+    namespace_config = {
         "lsf_fsp_file": str(lsf_fsp_file),
-        "output_root": str(output_root),
         "field_monitor_name": field_monitor_name,
         "trans_monitor_name": trans_monitor_name,
         "hide_lumerical": bool(hide_lumerical),
@@ -124,8 +123,19 @@ def run_sweep(
         "wave_nm": wave_nm.tolist(),
         "max_retry": int(max_retry),
     }
-    with open(output_root / "config.json", "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2)
+    if output_root is None:
+        output_root = build_scatterer_output_dir(output_base, namespace_config)
+    output_root = Path(output_root)
+    config_hash = hash_from_namespace(output_root) or stable_config_hash(namespace_config)
+
+    ensure_dir(output_root)
+    config = {
+        **namespace_config,
+        "output_root": str(output_root),
+        "output_namespace": str(output_root),
+        "config_hash": config_hash,
+    }
+    save_json(output_root / "config.json", config)
 
     fig_dir = output_root / "fig_phase_trans"
     ensure_dir(fig_dir)
@@ -258,7 +268,12 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Run a Lumerical LC index sweep.")
-    parser.add_argument("--output-root", default=str(OUTPUT_ROOT), help="Output directory")
+    parser.add_argument(
+        "--output-root",
+        default=None,
+        help="Explicit output directory. If omitted, use output/scatterer_datas/{scheme}_p{period}_r{radius}_{hash}.",
+    )
+    parser.add_argument("--output-base", default=str(OUTPUT_BASE), help="Base directory for automatic scatterer namespaces")
     parser.add_argument("--num-wave", type=int, default=num_wave, help="Number of wavelength points")
     parser.add_argument("--max-retry", type=int, default=MAX_RETRY, help="Retry attempts per index")
     parser.add_argument("--index-start", type=float, default=1.55, help="Start LC index")
@@ -303,16 +318,18 @@ def main():
     # period_list = [0.322e-6, 0.324e-6, 0.326e-6, 0.328e-6, 0.33e-6]
     period_list = [0.34e-6]
     r_scatter_list = [0.12/0.36*p for p in period_list]
-    output_root_list = [f"./automated_result_glass_0.3/{OUTPUT_ROOT}_r{int(r*1e9)}nm_p{int(p*1e9)}nm" for r, p in zip(r_scatter_list, period_list)]
-
-    
-    for i, output_root in enumerate(output_root_list):
-        print(f"Would run sweep with period={period_list[i]:.3e} m and r_scatter={r_scatter_list[i]:.3e} m, output_root='{output_root}'")
+    for i, period_value in enumerate(period_list):
+        explicit_output = Path(args.output_root) if args.output_root else None
+        print(
+            f"Would run sweep with period={period_value:.3e} m "
+            f"and r_scatter={r_scatter_list[i]:.3e} m"
+        )
 
         run_sweep(
-            period=period_list[i],
+            period=period_value,
             r_scatter=r_scatter_list[i],
-            output_root=output_root,
+            output_root=explicit_output,
+            output_base=Path(args.output_base),
             hide_lumerical=False,
             num_wave=args.num_wave,
             max_retry=args.max_retry,

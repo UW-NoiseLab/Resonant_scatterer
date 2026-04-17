@@ -333,7 +333,7 @@ set("angle phi",0);
 
 adddftmonitor;
 
-set("name","R_1.7");
+set("name","R_monitor");
 
 set("monitor type","2D Z-normal");
 
