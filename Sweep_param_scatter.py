@@ -35,26 +35,27 @@ FIELD_MONITOR_NAME = "monitor"       # 用来取 E
 TRANS_MONITOR_NAME = "monitor"     # 用来取 transmission / reflectance
 
 # Scatterer scheme: "SiN on Top" or "SiN on Bottom" or "TiO2 on Top" or "TiO2 on Bottom"
-SCATTERER_SCHEME = "SiN on Bottom"
 SCATTERER_SCHEME_CHOICES = ("SiN on Top", "SiN on Bottom", "TiO2 on Top", "TiO2 on Bottom")
 
 
 # 是否隐藏 Lumerical GUI
 HIDE_LUMERICAL = True
+SCATTERER_SCHEME = "SiN on Bottom"
 ONLY_CREATE_MODEL = False
-# =========================================================
-# 2) 建模参数
-# =========================================================
 
-period = 0.36e-6
 t_Al = 0.30e-6
 t_spacer = 0.17e-6
 t_LC = 0.50e-6
+t_scatter = 0.20e-6
+
+
+period = 0.36e-6
 t_ITO = 0.2e-6
 t_glass = 0.1e-6
 r_scatter = 0.11e-6
-t_scatter = 0.20e-6
-lambda_start = 0.550e-6
+
+
+lambda_start = 0.400e-6
 lambda_stop = 0.70e-6
 
 # 折射率扫描
@@ -294,36 +295,54 @@ def main():
     parser.add_argument("--index-start", type=float, default=1.55, help="Start LC index")
     parser.add_argument("--index-stop", type=float, default=1.75, help="Stop LC index")
     parser.add_argument("--index-step", type=float, default=0.01, help="Step size for LC index")
-    parser.add_argument("--hide-gui", action="store_false", help="Hide Lumerical GUI")
-    parser.add_argument(
-        "--scatterer-scheme",
-        default=SCATTERER_SCHEME,
-        choices=SCATTERER_SCHEME_CHOICES,
-        help="Scatterer material and z-placement scheme",
-    )
+
     args = parser.parse_args()
     
-    period_list = [0.36e-6]
-    r_scatter_list = [0.11e-6]
-    for i, period_value in enumerate(period_list):
-        explicit_output = Path(args.output_root) if args.output_root else None
-        print(
-            f"Would run sweep with period={period_value:.3e} m "
-            f"and r_scatter={r_scatter_list[i]:.3e} m"
-        )
-
-        run_sweep(
-            period=period_value,
-            r_scatter=r_scatter_list[i],
-            output_root=explicit_output,
-            output_base=Path(args.output_base),
-            hide_lumerical=HIDE_LUMERICAL,
-            num_wave=args.num_wave,
-            max_retry=args.max_retry,
-            index_values=np.arange(args.index_start, args.index_stop + 1e-12, args.index_step),
-            only_create_model=ONLY_CREATE_MODEL,
-            scatterer_scheme=args.scatterer_scheme,
-        )
+    run_sweep(
+        output_root=Path(args.output_root) if args.output_root else None,
+        output_base=Path(args.output_base),
+        hide_lumerical=HIDE_LUMERICAL,
+        num_wave=args.num_wave,
+        max_retry=args.max_retry,
+        index_values=np.arange(args.index_start, args.index_stop + 1e-12, args.index_step),
+        only_create_model=ONLY_CREATE_MODEL,
         
+        scatterer_scheme=SCATTERER_SCHEME,
+        period=period,
+        t_Al=t_Al,
+        t_spacer=t_spacer,
+        t_LC=t_LC,
+        t_ITO=t_ITO,
+        t_glass=t_glass,
+        r_scatter=r_scatter,
+        t_scatter=t_scatter,
+        lambda_start=lambda_start,
+        lambda_stop=lambda_stop,
+    )
+
+def overwrite_default_params(params: dict):
+    """Overwrite default parameters with provided ones."""
+    global SCATTERER_SCHEME, period, t_Al, t_spacer, t_LC, t_ITO, t_glass, r_scatter, t_scatter, lambda_start, lambda_stop, index_values, num_wave
+    SCATTERER_SCHEME = params.get("scatterer_scheme", SCATTERER_SCHEME)
+    period = params.get("period", period)
+    t_Al = params.get("t_Al", t_Al)
+    t_spacer = params.get("t_spacer", t_spacer)
+    t_LC = params.get("t_LC", t_LC)
+    t_ITO = params.get("t_ITO", t_ITO)
+    t_glass = params.get("t_glass", t_glass)
+    r_scatter = params.get("r_scatter", r_scatter)
+    t_scatter = params.get("t_scatter", t_scatter)
+    lambda_start = params.get("lambda_start", lambda_start)
+    lambda_stop = params.get("lambda_stop", lambda_stop)
+    
+    
 if __name__ == "__main__":
+    from archived_scatterer_params import SiN_b_565nm, SiN_t_490nm, ACSNano_TiO2_665nm
+    # overwrite_default_params(SiN_t_490nm)
+    # main()
+    
+    # overwrite_default_params(SiN_b_565nm)
+    # main()
+    
+    overwrite_default_params(ACSNano_TiO2_665nm)
     main()
