@@ -5,3 +5,6 @@
 
 # keep python files
 !*.py
+
+!LC_simulation.fsp
+!Grating_simulation.fsp

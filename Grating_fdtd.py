@@ -19,19 +19,25 @@ from Grating_lsf_gen import grating_lsf_gen
 # 预先建好的 fsp 模型
 LSF_FSP_FILE = r"./Grating_simulation.fsp"
 
-SCATTERER_SCHEME = "TiO2 on Top"
+
 
 # 是否隐藏 Lumerical GUI
 HIDE_LUMERICAL = False
 
-grating_wavelength_nm = 533.0
 
-scatterer_data_folder = Path("./automated_result_glass_3/automated_sweep_results_r107nm_p322nm")
+# SCATTERER_SCHEME = "SiN on Bottom"
+# scatterer_data_folder = Path("./output_single_scatterer/scatterer_datas/SiN_on_Bottom_p360nm_r110nm_33522cb959")
+# grating_wavelength_nm = 564.0
+
+SCATTERER_SCHEME = "SiN on Top"
+scatterer_data_folder = Path("./output_single_scatterer/scatterer_datas/SiN_on_Top_p360nm_r120nm_b1aa3ddf81")
+grating_wavelength_nm = 490.0
+
 
 # 输出根目录
-OUTPUT_BASE = Path("output/grating_datas")
+OUTPUT_BASE = Path("output_single_grating/grating_datas")
 
-def load_scatterer_config_and_data(data_folder, target_wavelength_nm=533.0):
+def load_scatterer_config_and_data(data_folder, target_wavelength_nm):
     """Load configuration and lookup tables from scatterer results at target wavelength."""
 
     data_folder = Path(data_folder)
@@ -76,7 +82,6 @@ def load_scatterer_config_and_data(data_folder, target_wavelength_nm=533.0):
         "lsf_content": lsf_content,
     }
 
-# Load scatterer data and generate LSF file at 533nm
 if __name__ == "__main__":
     result = load_scatterer_config_and_data(scatterer_data_folder, target_wavelength_nm=grating_wavelength_nm)
     grating_cells = 15
@@ -127,18 +132,17 @@ if __name__ == "__main__":
     fdtd.eval(f"createmodel({grating_cells},{steering_angle_deg});")
     
 
-    # fdtd.eval("run;")
-    # # fdtd.farfield3d()
-    # target_wavelengths_nm = np.linspace(grating_wavelength_nm - 20, grating_wavelength_nm + 20, 5)  # Example: 5 wavelengths from 500nm to 600nm
-    # target_wavelengths_m = [wl * 1e-9 for wl in target_wavelengths_nm]
+    fdtd.eval("run;")
 
-    # farfield_results = save_farfield_data_multiple_wavelengths(
-    #     fdtd=fdtd,
-    #     monitor_name="R_monitor",
-    #     target_wavelengths_m=target_wavelengths_m,
-    #     output_dir=output_root / "farfield_data",
-    #     prefix="grating_farfield",
-    #     make_plot=True,
-    # )
-    
-    # fdtd.save(LSF_FSP_FILE)
+    target_wavelengths_nm = np.linspace(grating_wavelength_nm - 20, grating_wavelength_nm + 20, 5)  # Example: 5 wavelengths from 500nm to 600nm
+    target_wavelengths_m = [wl * 1e-9 for wl in target_wavelengths_nm]
+
+    farfield_results = save_farfield_data_multiple_wavelengths(
+        fdtd=fdtd,
+        monitor_name="R_monitor",
+        target_wavelengths_m=target_wavelengths_m,
+        output_dir=output_root / "farfield_data",
+        prefix="grating_farfield",
+        make_plot=True,
+    )
+
