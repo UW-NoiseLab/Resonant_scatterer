@@ -26,6 +26,7 @@ DEFAULT_SCATTERER_FSP = "./LC_simulation.fsp"
 DEFAULT_GRATING_FSP = "./Grating_simulation.fsp"
 SCATTERER_SCHEME_CHOICES = ("SiN on Top", "SiN on Bottom", "TiO2 on Top", "TiO2 on Bottom")
 
+OUTPUT_ROOT = r"./output"
 
 DEFAULT_PERIOD_LIST = [0.34e-6, 0.36e-6, 0.38e-6]
 
@@ -190,6 +191,23 @@ def design_and_simulate_grating(candidate, args, output_dir):
             pass
 
 
+def candidates_for_requested_wavelengths(requested_wavelengths_nm, scored_candidates):
+    """Create simulation candidates from user-requested wavelengths."""
+    scored_wavelengths = np.array([candidate["wavelength_nm"] for candidate in scored_candidates])
+
+    requested_candidates = []
+    for requested_wavelength_nm in requested_wavelengths_nm:
+        nearest_idx = int(np.argmin(np.abs(scored_wavelengths - requested_wavelength_nm)))
+        nearest = dict(scored_candidates[nearest_idx])
+        nearest["requested_wavelength_nm"] = float(requested_wavelength_nm)
+        nearest["wavelength_nm"] = float(scored_wavelengths[nearest_idx])
+        nearest["selection_mode"] = "user_requested_nearest_available"
+        nearest["request_error_nm"] = float(nearest["wavelength_nm"] - requested_wavelength_nm)
+        requested_candidates.append(nearest)
+
+    return requested_candidates
+
+
 def build_arg_parser():
     parser = argparse.ArgumentParser(
         description=(
@@ -200,9 +218,9 @@ def build_arg_parser():
     )
 
     parser.add_argument("--scatterer-output", default=None, help="Explicit scatterer data folder. If omitted, use the automatic scatterer namespace.")
-    parser.add_argument("--scatterer-output-base", default="output/scatterer_datas")
-    parser.add_argument("--grating-output-base", default="output/grating_datas")
-    parser.add_argument("--pipeline-output", default="output/pipeline_reports")
+    parser.add_argument("--scatterer-output-base", default=os.path.join(OUTPUT_ROOT, "scatterer_datas"))
+    parser.add_argument("--grating-output-base", default=os.path.join(OUTPUT_ROOT, "grating_datas"))
+    parser.add_argument("--pipeline-output", default=os.path.join(OUTPUT_ROOT, "pipeline_reports"))
     parser.add_argument("--scatterer-fsp", default=DEFAULT_SCATTERER_FSP)
     parser.add_argument("--grating-fsp", default=DEFAULT_GRATING_FSP)
     parser.add_argument(
@@ -240,6 +258,17 @@ def build_arg_parser():
     parser.add_argument("--min-mean-transmission", type=float, default=0.5)
     parser.add_argument("--candidate-count", type=int, default=5)
     parser.add_argument("--simulate-top-n", type=int, default=1)
+    parser.add_argument(
+        "--test-wavelength-nm",
+        type=float,
+        nargs="+",
+        default=None,
+        help=(
+            "One or more wavelengths to simulate directly. Values are snapped to "
+            "the nearest wavelength available in the scatterer sweep. If omitted, "
+            "the top scored wavelengths are simulated."
+        ),
+    )
     parser.add_argument("--grating-cells", type=int, default=10)
     parser.add_argument("--steering-angle-deg", type=float, default=8.0)
     parser.add_argument("--farfield-monitor", default="R_monitor")
@@ -286,8 +315,21 @@ def run_single_regime_period_radius(args, scheme, period, r_scatter):
             f"LUT points={candidate['usable_lut_points']}/{candidate['total_index_points']}"
         )
 
+    if args.test_wavelength_nm:
+        simulation_candidates = candidates_for_requested_wavelengths(args.test_wavelength_nm, candidates)
+        print("\nUser-requested wavelength candidates:")
+        for candidate in simulation_candidates:
+            print(
+                f"requested={candidate['requested_wavelength_nm']:.2f} nm, "
+                f"nearest={candidate['wavelength_nm']:.2f} nm, "
+                f"error={candidate['request_error_nm']:.3f} nm, "
+                f"score={candidate['score']:.3f}"
+            )
+    else:
+        simulation_candidates = candidates[: args.simulate_top_n]
+
     peak_results = []
-    for candidate in candidates[: args.simulate_top_n]:
+    for candidate in simulation_candidates:
         grating_config = {
             **scatterer_results["config"],
             "wavelength_nm": float(candidate["wavelength_nm"]),
@@ -320,6 +362,7 @@ def run_single_regime_period_radius(args, scheme, period, r_scatter):
         "scatterer_output": args.scatterer_output,
         "report_dir": str(run_report_dir),
         "top_candidates": candidates[: args.candidate_count],
+        "simulation_candidates": simulation_candidates,
         "peak_results": peak_results,
     }
 

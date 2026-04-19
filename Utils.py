@@ -167,19 +167,17 @@ def average_phase_over_xy(Ex: np.ndarray):
     对每个 wavelength，把 Ex 在横向平面平均后取相位。
     支持 squeeze 后:
     - (Nx, Ny, Nlambda)
-    - (Nx, Ny) 只有一个波长
     """
     arr = np.squeeze(Ex)
 
     if arr.ndim == 3:
         complex_mean = arr.mean(axis=(0, 1))
-    elif arr.ndim == 2:
-        complex_mean = np.array([arr.mean()])
     else:
         raise ValueError(f"Unexpected Ex shape after squeeze: {arr.shape}")
 
     phase = np.angle(complex_mean)
     amplitude = np.abs(complex_mean)
+    print(f"Average amplitude over xy: {amplitude}")
     return phase, amplitude, complex_mean
 
 

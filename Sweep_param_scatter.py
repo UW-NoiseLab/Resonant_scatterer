@@ -28,20 +28,20 @@ from Scatterer_lsf_gen import scatterer_lsf_gen
 LSF_FSP_FILE = r"./LC_simulation.fsp"
 
 # Scatterer sweeps default to output/scatterer_datas/{scheme}_p{period}_r{radius}_{hash}.
-OUTPUT_BASE = Path("output/scatterer_datas")
+OUTPUT_BASE = Path("output_single_scatterer/scatterer_datas")
 
 # monitor names
 FIELD_MONITOR_NAME = "monitor"       # 用来取 E
 TRANS_MONITOR_NAME = "monitor"     # 用来取 transmission / reflectance
 
 # Scatterer scheme: "SiN on Top" or "SiN on Bottom" or "TiO2 on Top" or "TiO2 on Bottom"
-SCATTERER_SCHEME = "TiO2 on Top"
+SCATTERER_SCHEME = "SiN on Bottom"
 SCATTERER_SCHEME_CHOICES = ("SiN on Top", "SiN on Bottom", "TiO2 on Top", "TiO2 on Bottom")
 
 
 # 是否隐藏 Lumerical GUI
 HIDE_LUMERICAL = True
-
+ONLY_CREATE_MODEL = False
 # =========================================================
 # 2) 建模参数
 # =========================================================
@@ -50,19 +50,18 @@ period = 0.36e-6
 t_Al = 0.30e-6
 t_spacer = 0.17e-6
 t_LC = 0.50e-6
-t_ITO = 0.05e-6
-t_glass = 3.0e-6
-r_scatter = 0.12e-6
+t_ITO = 0.2e-6
+t_glass = 0.1e-6
+r_scatter = 0.11e-6
 t_scatter = 0.20e-6
-lambda_start = 0.40e-6
+lambda_start = 0.550e-6
 lambda_stop = 0.70e-6
 
 # 折射率扫描
-index_values = np.arange(1.55, 1.75 + 1e-12, 0.01)
+index_values = np.arange(1.55, 1.75, 0.01)
 
 # 波长轴
-num_wave = 100
-wave_nm = np.linspace(400, 700, num_wave)
+num_wave = 151
 
 # 最大重试次数
 MAX_RETRY = 6
@@ -98,7 +97,7 @@ def run_sweep(
         index_values = np.arange(1.55, 1.75 + 1e-12, 0.01)
     index_values = np.asarray(index_values, dtype=float)
 
-    wave_nm = np.linspace(400, 700, num_wave)
+    wave_nm = np.linspace(lambda_start * 1e9, lambda_stop * 1e9, num_wave)  # Convert to nm for output
     n_index = len(index_values)
     n_wave = len(wave_nm)
 
@@ -197,7 +196,7 @@ def run_sweep(
                         time.sleep(2000.0)
                         return
 
-                    time.sleep(1.0)
+                    # time.sleep(1.0)
                     fdtd.run()
                     time.sleep(1.0)
 
@@ -224,6 +223,7 @@ def run_sweep(
                     break
                 except Exception as e:
                     print(f"    Attempt {retry+1} failed: {e}")
+                    print(lsf_code)
                     time.sleep(1.0)
 
             if not success:
@@ -288,36 +288,8 @@ def main():
     )
     args = parser.parse_args()
     
-    # r_scatter_list = [0.08e-6, 0.10e-6, 0.12e-6, 0.14e-6, 0.16e-6]
-    # output_root_list = [f"{OUTPUT_ROOT}_r{int(r*1e9)}nm" for r in r_scatter_list]
-
-    # for i, output_root in enumerate(output_root_list):
-    #     run_sweep(
-    #         r_scatter=r_scatter_list[i],
-    #         output_root=output_root,
-    #         hide_lumerical=args.hide_gui,
-    #         num_wave=args.num_wave,
-    #         max_retry=args.max_retry,
-    #         index_values=np.arange(args.index_start, args.index_stop + 1e-12, args.index_step),
-    #     )
-    
-    # period_list = [0.34e-6, 0.36e-6, 0.38e-6]
-    # output_root_list = [f"{OUTPUT_ROOT}_p{int(p*1e9)}nm" for p in period_list]
-    
-    # for i, output_root in enumerate(output_root_list):
-    #     run_sweep(
-    #         period=period_list[i],
-    #         output_root=output_root,
-    #         hide_lumerical=args.hide_gui,
-    #         num_wave=args.num_wave,
-    #         max_retry=args.max_retry,
-    #         index_values=np.arange(args.index_start, args.index_stop + 1e-12, args.index_step),
-    #     )
-    
-    # period_list = [0.25e-6, 0.26e-6, 0.27e-6, 0.28e-6, 0.29e-6, 0.30e-6, 0.31e-6, 0.32e-6, 0.33e-6, 0.34e-6, 0.35e-6, 0.36e-6, 0.37e-6, 0.38e-6]
-    # period_list = [0.322e-6, 0.324e-6, 0.326e-6, 0.328e-6, 0.33e-6]
-    period_list = [0.34e-6]
-    r_scatter_list = [0.12/0.36*p for p in period_list]
+    period_list = [0.36e-6]
+    r_scatter_list = [0.11e-6]
     for i, period_value in enumerate(period_list):
         explicit_output = Path(args.output_root) if args.output_root else None
         print(
@@ -334,7 +306,7 @@ def main():
             num_wave=args.num_wave,
             max_retry=args.max_retry,
             index_values=np.arange(args.index_start, args.index_stop + 1e-12, args.index_step),
-            only_create_model=True,
+            only_create_model=ONLY_CREATE_MODEL,
             scatterer_scheme=args.scatterer_scheme,
         )
         

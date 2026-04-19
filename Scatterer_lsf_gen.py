@@ -55,8 +55,8 @@ __SCATTER_Z_POSITION__
 scatter_z_center = 0.5*(scatter_z_min + scatter_z_max);
 
 # FDTD margins
-z_margin_bottom = 0.3e-6;
-z_margin_top = 0.3e-6;
+z_margin_bottom = 0.85e-6;
+z_margin_top = 0.98e-6;
 
 fdtd_z_min = Al_z_min - 0.3e-6;
 fdtd_z_max = glass_z_min + 0.8e-6;
@@ -69,7 +69,6 @@ fdtd_z_max = glass_z_min + 0.8e-6;
 mat_substrate = "SiO2 (Glass) - Palik";
 mat_Al        = "Al (Aluminium) - Palik";
 mat_spacer    = "SiO2 (Glass) - Palik";
-mat_ITO       = "ITO (Indium Tin Oxide) - Kischkat";
 mat_glass     = "SiO2 (Glass) - Palik";
 mat_scatter   = "__SCATTER_MATERIAL__";
 
@@ -195,7 +194,7 @@ set("x", 0);
 set("y", 0);
 set("x span", period);
 set("y span", period);
-set("z", glass_z_min + 0.3e-6);
+set("z", glass_z_min + 0.28e-6);
 set("wavelength start", lambda_start);
 set("wavelength stop", lambda_stop);
 
@@ -259,10 +258,21 @@ set("x", 0);
 set("y", 0);
 set("x span", period);
 set("y span", period);
-set("z", ITO_z_max + 0.5e-6);
+set("z", ITO_z_max + 0.48e-6);
 #set("override global monitor settings", 1);
 #set("use source limits", 1);
 
+
+# Side View monitor
+adddftmonitor;
+set("name", "x_normal_monitor");
+set("monitor type", "2D x-normal");
+
+set("y", 0);
+set("x", 0);
+set("y span", period);
+set("z min", Al_z_min - 0.15e-6);
+set("z max", glass_z_min + 0.18e-6);
 
 # Horizontal cross-section field monitor (same position as index_xy)
 #adddftmonitor;
