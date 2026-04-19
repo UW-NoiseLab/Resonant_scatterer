@@ -49,3 +49,33 @@ ACSNano_TiO2_665nm = {
 # At their vertical orientation, the LC directors are said to be switched completely, 
 # and light “sees” an ordinary refractive index (n0) while passing through the LC cell. 
 # We used commercially available LC with ne = 1.5221 and n0 = 1.522 (i.e., birefringence of Δn = 0.291). 
+
+
+TiO2_t_Zhihao = {
+    'scatterer_scheme': "TiO2 on Top",
+    'period': 0.36e-6,
+    't_Al': 0.30e-6,
+    't_spacer': 0.17e-6,
+    't_LC': 0.50e-6,
+    't_ITO': 0.023e-6,
+    't_glass': 0.1e-6,
+    'r_scatter': 0.13e-6,
+    't_scatter': 0.22e-6,
+    'lambda_start': 550e-9,
+    'lambda_stop': 700e-9,
+}
+
+
+SiN_b_Zhihao = {
+    'scatterer_scheme': "SiN on Bottom",
+    'period': 0.36e-6,
+    't_Al': 0.30e-6,
+    't_spacer': 0.17e-6,
+    't_LC': 0.50e-6,
+    't_ITO': 0.023e-6,
+    't_glass': 0.1e-6,
+    'r_scatter': 0.13e-6,
+    't_scatter': 0.22e-6,
+    'lambda_start': 550e-9,
+    'lambda_stop': 700e-9,
+}

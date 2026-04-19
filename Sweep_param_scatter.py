@@ -337,12 +337,19 @@ def overwrite_default_params(params: dict):
     
     
 if __name__ == "__main__":
-    from archived_scatterer_params import SiN_b_565nm, SiN_t_490nm, ACSNano_TiO2_665nm
+    from archived_scatterer_params import SiN_b_565nm, SiN_t_490nm, ACSNano_TiO2_665nm, \
+    TiO2_t_Zhihao, SiN_b_Zhihao
     # overwrite_default_params(SiN_t_490nm)
     # main()
     
     # overwrite_default_params(SiN_b_565nm)
     # main()
     
-    overwrite_default_params(ACSNano_TiO2_665nm)
+    # overwrite_default_params(ACSNano_TiO2_665nm)
+    # main()
+
+    overwrite_default_params(TiO2_t_Zhihao)
+    main()
+    
+    overwrite_default_params(SiN_b_Zhihao)
     main()
