@@ -28,14 +28,6 @@ SCATTERER_SCHEME_CHOICES = ("SiN on Top", "SiN on Bottom", "TiO2 on Top", "TiO2 
 
 OUTPUT_ROOT = r"./output"
 
-DEFAULT_PERIOD_LIST = [0.34e-6, 0.36e-6, 0.38e-6]
-
-
-def period_radius_pairs():
-    """Return the default period sweep with radius scaled from r=0.12 um at p=0.36 um."""
-    period_list = DEFAULT_PERIOD_LIST
-    r_scatter_list = [0.12 / 0.36 * p for p in period_list]
-    return list(zip(period_list, r_scatter_list))
 
 
 def regime_schemes(selected_scheme):
@@ -208,74 +200,6 @@ def candidates_for_requested_wavelengths(requested_wavelengths_nm, scored_candid
     return requested_candidates
 
 
-def build_arg_parser():
-    parser = argparse.ArgumentParser(
-        description=(
-            "Run/load a scatterer phase sweep, identify wavelengths with good 0-2pi "
-            "phase coverage and transmission, then design grating simulations and "
-            "check far-field steering peaks."
-        )
-    )
-
-    parser.add_argument("--scatterer-output", default=None, help="Explicit scatterer data folder. If omitted, use the automatic scatterer namespace.")
-    parser.add_argument("--scatterer-output-base", default=os.path.join(OUTPUT_ROOT, "scatterer_datas"))
-    parser.add_argument("--grating-output-base", default=os.path.join(OUTPUT_ROOT, "grating_datas"))
-    parser.add_argument("--pipeline-output", default=os.path.join(OUTPUT_ROOT, "pipeline_reports"))
-    parser.add_argument("--scatterer-fsp", default=DEFAULT_SCATTERER_FSP)
-    parser.add_argument("--grating-fsp", default=DEFAULT_GRATING_FSP)
-    parser.add_argument(
-        "--scatterer-scheme",
-        default=None,
-        choices=SCATTERER_SCHEME_CHOICES,
-        help="Run only one scatterer regime. If omitted, sweep all four regimes.",
-    )
-    parser.add_argument("--force-scatterer-sweep", action="store_true")
-    parser.add_argument(
-        "--show-lumerical",
-        dest="hide_lumerical",
-        action="store_false",
-        help="Show the Lumerical GUI. By default, simulations run hidden.",
-    )
-    parser.set_defaults(hide_lumerical=False)
-
-    parser.add_argument("--period", type=float, default=0.36e-6)
-    parser.add_argument("--t-al", type=float, default=0.30e-6)
-    parser.add_argument("--t-spacer", type=float, default=0.17e-6)
-    parser.add_argument("--t-lc", type=float, default=0.50e-6)
-    parser.add_argument("--t-ito", type=float, default=0.05e-6)
-    parser.add_argument("--t-glass", type=float, default=3.0e-6)
-    parser.add_argument("--r-scatter", type=float, default=0.12e-6)
-    parser.add_argument("--t-scatter", type=float, default=0.20e-6)
-
-    parser.add_argument("--lambda-start-nm", type=float, default=400.0)
-    parser.add_argument("--lambda-stop-nm", type=float, default=700.0)
-    parser.add_argument("--num-wave", type=int, default=100)
-    parser.add_argument("--index-start", type=float, default=1.55)
-    parser.add_argument("--index-stop", type=float, default=1.75)
-    parser.add_argument("--index-step", type=float, default=0.01)
-    parser.add_argument("--max-retry", type=int, default=6)
-
-    parser.add_argument("--min-mean-transmission", type=float, default=0.5)
-    parser.add_argument("--candidate-count", type=int, default=5)
-    parser.add_argument("--simulate-top-n", type=int, default=1)
-    parser.add_argument(
-        "--test-wavelength-nm",
-        type=float,
-        nargs="+",
-        default=None,
-        help=(
-            "One or more wavelengths to simulate directly. Values are snapped to "
-            "the nearest wavelength available in the scatterer sweep. If omitted, "
-            "the top scored wavelengths are simulated."
-        ),
-    )
-    parser.add_argument("--grating-cells", type=int, default=10)
-    parser.add_argument("--steering-angle-deg", type=float, default=8.0)
-    parser.add_argument("--farfield-monitor", default="R_monitor")
-
-    return parser
-
-
 def run_single_regime_period_radius(args, scheme, period, r_scatter):
     args.scatterer_scheme = scheme
     args.period = period
@@ -367,13 +291,116 @@ def run_single_regime_period_radius(args, scheme, period, r_scatter):
     }
 
 
+
+
+def build_arg_parser():
+    parser = argparse.ArgumentParser(
+        description=(
+            "Run/load a scatterer phase sweep, identify wavelengths with good 0-2pi "
+            "phase coverage and transmission, then design grating simulations and "
+            "check far-field steering peaks."
+        )
+    )
+
+    parser.add_argument("--scatterer-output", default=None, help="Explicit scatterer data folder. If omitted, use the automatic scatterer namespace.")
+    parser.add_argument("--scatterer-output-base", default=os.path.join(OUTPUT_ROOT, "scatterer_datas"))
+    parser.add_argument("--grating-output-base", default=os.path.join(OUTPUT_ROOT, "grating_datas"))
+    parser.add_argument("--pipeline-output", default=os.path.join(OUTPUT_ROOT, "pipeline_reports"))
+    parser.add_argument("--scatterer-fsp", default=DEFAULT_SCATTERER_FSP)
+    parser.add_argument("--grating-fsp", default=DEFAULT_GRATING_FSP)
+    parser.add_argument(
+        "--scatterer-scheme",
+        default=None,
+        choices=SCATTERER_SCHEME_CHOICES,
+        help="Run only one scatterer regime. If omitted, sweep all four regimes.",
+    )
+    parser.add_argument("--force-scatterer-sweep", action="store_true")
+    parser.add_argument(
+        "--show-lumerical",
+        dest="hide_lumerical",
+        action="store_false",
+        help="Show the Lumerical GUI. By default, simulations run hidden.",
+    )
+    parser.set_defaults(hide_lumerical=False)
+
+    parser.add_argument("--period", type=float, default=0.36e-6)
+    parser.add_argument("--t-al", type=float, default=0.30e-6)
+    parser.add_argument("--t-spacer", type=float, default=0.17e-6)
+    parser.add_argument("--t-lc", type=float, default=0.50e-6)
+    parser.add_argument("--t-ito", type=float, default=0.05e-6)
+    parser.add_argument("--t-glass", type=float, default=3.0e-6)
+    parser.add_argument("--r-scatter", type=float, default=0.12e-6)
+    parser.add_argument("--t-scatter", type=float, default=0.20e-6)
+
+    parser.add_argument("--lambda-start-nm", type=float, default=400.0)
+    parser.add_argument("--lambda-stop-nm", type=float, default=700.0)
+    parser.add_argument("--num-wave", type=int, default=100)
+    parser.add_argument("--index-start", type=float, default=1.55)
+    parser.add_argument("--index-stop", type=float, default=1.75)
+    parser.add_argument("--index-step", type=float, default=0.01)
+    parser.add_argument("--max-retry", type=int, default=6)
+
+    parser.add_argument("--min-mean-transmission", type=float, default=0.5)
+    parser.add_argument("--candidate-count", type=int, default=5)
+    parser.add_argument("--simulate-top-n", type=int, default=1)
+    parser.add_argument(
+        "--test-wavelength-nm",
+        type=float,
+        nargs="+",
+        default=None,
+        help=(
+            "One or more wavelengths to simulate directly. Values are snapped to "
+            "the nearest wavelength available in the scatterer sweep. If omitted, "
+            "the top scored wavelengths are simulated."
+        ),
+    )
+    parser.add_argument("--grating-cells", type=int, default=15)
+    parser.add_argument("--steering-angle-deg", type=float, default=10.0)
+    parser.add_argument("--farfield-monitor", default="R_monitor")
+
+    return parser
+
+def overwrite_default_params(args, params: dict):
+    """Overwrite args namespace with params (case-insensitive keys)."""
+
+    args_key_map = {k.lower(): k for k in vars(args).keys()}
+
+    for key, value in params.items():
+        key_lower = key.lower()
+
+        if key_lower in args_key_map:
+            real_key = args_key_map[key_lower]
+            setattr(args, real_key, value)
+            print(f"Overwrote param: {real_key} = {value} (from '{key}')")
+        else:
+            raise KeyError(f"Args does not have attribute '{key}' (case-insensitive match failed).")
+
+
 def main():
+    
     args = build_arg_parser().parse_args()
+    
+    from archived_scatterer_params import SiN_b_565nm, SiN_t_490nm
+    
+    overwrite_default_params(args, SiN_t_490nm)
+    
+    
     output_root = ensure_dir(args.pipeline_output)
+    
+    
+    arg_period = args.period   # 0.36e-6
+    arg_r_scatter = args.r_scatter
+    
+    period_list = np.arange(arg_period - 0.05e-6, arg_period + 0.05e-6 + 1e-12, 0.01e-6)
+    r_scatter_list = arg_r_scatter * period_list / arg_period  # scale r_scatter proportionally with period
+    
+    # period_list = [0.36e-6]
+    # r_scatter_list = [0.11e-6]
+    
 
     sweep_results = []
     for scheme in regime_schemes(args.scatterer_scheme):
-        for period, r_scatter in period_radius_pairs():
+        for period, r_scatter in list(zip(period_list, r_scatter_list)):
             sweep_results.append(run_single_regime_period_radius(args, scheme, period, r_scatter))
 
     save_json(output_root / "sweep_summary.json", sweep_results)

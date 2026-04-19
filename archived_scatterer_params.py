@@ -31,7 +31,7 @@ ACSNano_TiO2_665nm = {
     't_spacer': 0.17e-6,
     't_LC': 0.50e-6,
     't_ITO': 0.023e-6,
-    't_glass': 0.1e-6,
+    't_glass': 10.0e-6,
     'r_scatter': 0.13e-6,
     't_scatter': 0.22e-6,
     'lambda_start': 550e-9,
