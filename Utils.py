@@ -177,7 +177,7 @@ def average_phase_over_xy(Ex: np.ndarray):
 
     phase = np.angle(complex_mean)
     amplitude = np.abs(complex_mean)
-    print(f"Average amplitude over xy: {amplitude}")
+    # print(f"Average amplitude over xy: {amplitude}")
     return phase, amplitude, complex_mean
 
 

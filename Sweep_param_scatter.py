@@ -158,6 +158,7 @@ def run_sweep(
         fdtd.eval(lsf_code)
 
         fdtd.switchtolayout()
+        fdtd.eval(f"setglobalmonitor('use wavelength spacing',1);")
         fdtd.eval(f'setglobalmonitor("frequency points",{num_wave});')
         print(f"[DEBUG] Set global monitor frequency points to {num_wave}")
         
@@ -203,6 +204,20 @@ def run_sweep(
                     Ex, wavelength_from_monitor = extract_complex_field_from_monitor(
                         fdtd, field_monitor_name
                     )
+                    
+                    tol = 1e-10  # 可以调
+
+                    if np.allclose(wavelength_from_monitor, wave_nm*1e-9, atol=tol, rtol=0):
+                        print("[DEBUG] Wavelengths from monitor match expected wave_nm.")
+
+                    elif np.allclose(wavelength_from_monitor[::-1], wave_nm*1e-9, atol=tol, rtol=0):
+                        print("[DEBUG] Wavelengths match in reverse order. Reversing data.")
+                        Ex = Ex[:, ::-1]
+
+                    else:
+                        raise ValueError("[WARNING] Wavelength mismatch!")
+                    
+                    
                     phase, _, _ = average_phase_over_xy(Ex)
 
                     trans = try_get_transmission(fdtd, trans_monitor_name)
@@ -302,7 +317,7 @@ def main():
             r_scatter=r_scatter_list[i],
             output_root=explicit_output,
             output_base=Path(args.output_base),
-            hide_lumerical=False,
+            hide_lumerical=HIDE_LUMERICAL,
             num_wave=args.num_wave,
             max_retry=args.max_retry,
             index_values=np.arange(args.index_start, args.index_stop + 1e-12, args.index_step),
