@@ -321,7 +321,7 @@ def build_arg_parser():
         action="store_false",
         help="Show the Lumerical GUI. By default, simulations run hidden.",
     )
-    parser.set_defaults(hide_lumerical=False)
+    parser.set_defaults(hide_lumerical=True)
 
     parser.add_argument("--period", type=float, default=0.36e-6)
     parser.add_argument("--t-al", type=float, default=0.30e-6)

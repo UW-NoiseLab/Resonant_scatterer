@@ -345,11 +345,11 @@ if __name__ == "__main__":
     # overwrite_default_params(SiN_b_565nm)
     # main()
     
-    # overwrite_default_params(ACSNano_TiO2_665nm)
-    # main()
+    overwrite_default_params(ACSNano_TiO2_665nm)
+    main()
 
-    overwrite_default_params(TiO2_t_Zhihao)
-    main()
+    # overwrite_default_params(TiO2_t_Zhihao)
+    # main()
     
-    overwrite_default_params(SiN_b_Zhihao)
-    main()
+    # overwrite_default_params(SiN_b_Zhihao)
+    # main()
