@@ -162,6 +162,14 @@ def extract_complex_field_from_monitor(fdtd, monitor_name: str):
     return Ex, wavelength
 
 
+def extract_monitor_wavelengths(fdtd, monitor_name: str):
+    """Return the wavelength axis of a monitor in meters."""
+    freq = np.array(fdtd.getdata(monitor_name, "f")).flatten()
+    if freq.size == 0:
+        raise RuntimeError(f"Empty frequency data from monitor '{monitor_name}'.")
+    return C0 / freq
+
+
 def average_phase_over_xy(Ex: np.ndarray):
     """
     对每个 wavelength，把 Ex 在横向平面平均后取相位。

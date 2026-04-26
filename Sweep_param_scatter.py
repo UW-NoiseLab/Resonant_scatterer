@@ -8,6 +8,7 @@ from Utils import (
     build_scatterer_output_dir,
     ensure_dir,
     extract_complex_field_from_monitor,
+    extract_monitor_wavelengths,
     average_phase_over_xy,
     try_get_transmission,
     plot_summary_figures,
@@ -213,7 +214,8 @@ def run_sweep(
 
                     elif np.allclose(wavelength_from_monitor[::-1], wave_nm*1e-9, atol=tol, rtol=0):
                         print("[DEBUG] Wavelengths match in reverse order. Reversing data.")
-                        Ex = Ex[:, ::-1]
+                        Ex = Ex[..., ::-1]
+                        wavelength_from_monitor = wavelength_from_monitor[::-1]
 
                     else:
                         raise ValueError("[WARNING] Wavelength mismatch!")
@@ -222,6 +224,16 @@ def run_sweep(
                     phase, _, _ = average_phase_over_xy(Ex)
 
                     trans = try_get_transmission(fdtd, trans_monitor_name)
+                    trans_wavelength = extract_monitor_wavelengths(fdtd, trans_monitor_name)
+
+                    if np.allclose(trans_wavelength, wave_nm * 1e-9, atol=tol, rtol=0):
+                        print("[DEBUG] Reflection wavelengths match expected wave_nm.")
+                    elif np.allclose(trans_wavelength[::-1], wave_nm * 1e-9, atol=tol, rtol=0):
+                        print("[DEBUG] Reflection wavelengths match in reverse order. Reversing data.")
+                        trans = trans[::-1]
+                        trans_wavelength = trans_wavelength[::-1]
+                    else:
+                        raise ValueError("[WARNING] Reflection wavelength mismatch!")
 
                     if len(phase) != n_wave:
                         raise RuntimeError(
@@ -230,6 +242,10 @@ def run_sweep(
                     if len(trans) != n_wave:
                         raise RuntimeError(
                             f"Transmission length {len(trans)} != expected {n_wave}"
+                        )
+                    if not np.allclose(wavelength_from_monitor, trans_wavelength, atol=tol, rtol=0):
+                        raise RuntimeError(
+                            "Field monitor wavelengths do not match reflection wavelengths after ordering."
                         )
 
                     phase_matrix[i, :] = phase
