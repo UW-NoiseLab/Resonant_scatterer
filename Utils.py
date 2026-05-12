@@ -517,6 +517,158 @@ def plot_summary_figures(
 # Far-field helpers
 # =========================================================
 
+def _parse_steering_angle_deg(folder_name):
+    """Extract the designed steering angle from names like steering_12deg_..."""
+    match = re.search(r"steering_(-?\d+(?:p\d+|\.\d+)?)deg", folder_name)
+    if match is None:
+        return None
+    return float(match.group(1).replace("p", "."))
+
+
+def _parse_farfield_profile_wavelength_nm(csv_path):
+    """Extract the wavelength from grating_farfield_620p2nm_x_profile.csv."""
+    match = re.search(r"grating_farfield_(\d+(?:p\d+|\.\d+)?)nm_x_profile\.csv$", csv_path.name)
+    if match is None:
+        return None
+    return float(match.group(1).replace("p", "."))
+
+
+def _closest_farfield_x_profile_csv(farfield_dir, target_wavelength_nm):
+    """Return the x-profile CSV in farfield_dir nearest to target_wavelength_nm."""
+    candidates = []
+    for csv_path in Path(farfield_dir).glob("grating_farfield_*nm_x_profile.csv"):
+        wavelength_nm = _parse_farfield_profile_wavelength_nm(csv_path)
+        if wavelength_nm is not None:
+            candidates.append((abs(wavelength_nm - target_wavelength_nm), wavelength_nm, csv_path))
+
+    if not candidates:
+        return None, None
+
+    _, wavelength_nm, csv_path = min(candidates, key=lambda item: item[0])
+    return csv_path, wavelength_nm
+
+
+def plot_grating_farfield_steering_map(
+    grating_dir,
+    wavelength_nm,
+    glass_refractive_index=1.5,
+    air_refractive_index=1.0,
+    output_file=None,
+    save_matrix=True,
+):
+    """
+    Stack each steering subfolder's nearest wavelength x-profile into a 2D map.
+
+    The CSV theta_x_deg values are treated as glass-side angles. The plotted
+    x-axis is converted to the corresponding air angle by Snell's law so it can
+    be compared directly with the designed beam steering angle.
+    """
+    grating_dir = Path(grating_dir)
+    if not grating_dir.exists():
+        raise FileNotFoundError(f"Grating directory not found: {grating_dir}")
+
+    rows = []
+    for subdir in sorted(item for item in grating_dir.iterdir() if item.is_dir()):
+        steering_angle_deg = _parse_steering_angle_deg(subdir.name)
+        if steering_angle_deg is None:
+            continue
+
+        farfield_dir = subdir / "farfield_data"
+        if not farfield_dir.is_dir():
+            continue
+
+        csv_path, actual_wavelength_nm = _closest_farfield_x_profile_csv(
+            farfield_dir, float(wavelength_nm)
+        )
+        if csv_path is None:
+            continue
+
+        data = np.genfromtxt(csv_path, delimiter=",", names=True)
+        theta_x_deg = np.asarray(data["theta_x_deg"], dtype=float).ravel()
+        intensity = np.asarray(data["intensity"], dtype=float).ravel()
+        if theta_x_deg.size != intensity.size:
+            raise ValueError(f"Malformed x-profile CSV: {csv_path}")
+
+        rows.append(
+            {
+                "steering_angle_deg": steering_angle_deg,
+                "actual_wavelength_nm": float(actual_wavelength_nm),
+                "csv_path": csv_path,
+                "theta_x_deg": theta_x_deg,
+                "intensity": intensity,
+            }
+        )
+
+    if not rows:
+        raise FileNotFoundError(
+            f"No grating_farfield_*nm_x_profile.csv files found under {grating_dir}"
+        )
+
+    rows.sort(key=lambda item: item["steering_angle_deg"])
+    theta_x_glass_deg = rows[0]["theta_x_deg"]
+    for row in rows[1:]:
+        if row["theta_x_deg"].shape != theta_x_glass_deg.shape or not np.allclose(
+            row["theta_x_deg"], theta_x_glass_deg
+        ):
+            raise ValueError(
+                "Cannot concatenate x-profiles because theta_x_deg axes differ. "
+                f"First mismatch: {row['csv_path']}"
+            )
+
+    steering_angles_deg = np.array([row["steering_angle_deg"] for row in rows])
+    actual_wavelengths_nm = np.array([row["actual_wavelength_nm"] for row in rows])
+    intensity_map = np.vstack([row["intensity"] for row in rows])
+    sin_theta_air = (
+        float(glass_refractive_index)
+        / float(air_refractive_index)
+        * np.sin(np.deg2rad(theta_x_glass_deg))
+    )
+    air_valid_mask = np.abs(sin_theta_air) <= 1.0
+    theta_x_air_deg = np.rad2deg(np.arcsin(sin_theta_air[air_valid_mask]))
+    intensity_map_air = intensity_map[:, air_valid_mask]
+
+    if output_file is None:
+        wl_tag = wavelength_tag(wavelength_nm, prefix="", decimals=1)
+        output_file = grating_dir / f"farfield_steering_map_{wl_tag}.png"
+    output_file = Path(output_file)
+    ensure_dir(output_file.parent)
+
+    plt.figure(figsize=(8, 5))
+    plt.pcolormesh(theta_x_air_deg, steering_angles_deg, intensity_map_air, shading="auto")
+    plt.xlabel("theta_x_air_deg")
+    plt.ylabel("Designed beam steering angle (deg)")
+    plt.title(
+        f"Far-field X profiles near {float(wavelength_nm):.1f} nm "
+        f"(actual {np.mean(actual_wavelengths_nm):.1f} nm, n_glass={float(glass_refractive_index):g})"
+    )
+    plt.colorbar(label="Integrated intensity")
+    plt.tight_layout()
+    plt.savefig(output_file, dpi=300)
+    plt.close()
+
+    if save_matrix:
+        np.save(output_file.with_suffix(".npy"), intensity_map_air)
+        np.save(output_file.with_name(output_file.stem + "_theta_x_air_deg.npy"), theta_x_air_deg)
+        np.save(output_file.with_name(output_file.stem + "_theta_x_glass_deg.npy"), theta_x_glass_deg)
+        np.save(
+            output_file.with_name(output_file.stem + "_steering_angles_deg.npy"),
+            steering_angles_deg,
+        )
+
+    print(f"Saved far-field steering map to: {output_file}")
+    return {
+        "output_file": str(output_file),
+        "theta_x_air_deg": theta_x_air_deg,
+        "theta_x_glass_deg": theta_x_glass_deg,
+        "steering_angles_deg": steering_angles_deg,
+        "actual_wavelengths_nm": actual_wavelengths_nm,
+        "intensity_map": intensity_map_air,
+        "glass_refractive_index": float(glass_refractive_index),
+        "air_refractive_index": float(air_refractive_index),
+        "source_files": [str(row["csv_path"]) for row in rows],
+    }
+
+
 def _monitor_wavelength_index(fdtd, monitor_name, target_lambda_m):
     """Find the monitor frequency index nearest to target wavelength."""
 
@@ -780,3 +932,47 @@ def add_angle_accuracy(peak_result, target_theta_deg):
     peak_result["best_abs_error_deg"] = float(min(same_sign_error, opposite_sign_error))
     peak_result["best_sign_match"] = "same" if same_sign_error <= opposite_sign_error else "opposite"
     return peak_result
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Plot a stacked far-field x-profile map across grating steering folders."
+    )
+    parser.add_argument(
+        "grating_dir",
+        nargs="?",
+        default=(
+            "output_single_grating/grating_datas/"
+            "TiO2_on_Top_p350nm_r135nm_wavelength620nm_da79e378a7"
+        ),
+        help="Directory containing steering_* subfolders.",
+    )
+    parser.add_argument(
+        "wavelength_nm",
+        nargs="?",
+        type=float,
+        default=620.0,
+        help="Target wavelength in nm.",
+    )
+    parser.add_argument(
+        "glass_refractive_index",
+        nargs="?",
+        type=float,
+        default=1.5,
+        help="Refractive index of glass used to convert theta_x_deg to air angle.",
+    )
+    parser.add_argument(
+        "--output-file",
+        default=None,
+        help="Optional output PNG path. Defaults inside grating_dir.",
+    )
+    args = parser.parse_args()
+
+    plot_grating_farfield_steering_map(
+        grating_dir=args.grating_dir,
+        wavelength_nm=args.wavelength_nm,
+        glass_refractive_index=args.glass_refractive_index,
+        output_file=args.output_file,
+    )

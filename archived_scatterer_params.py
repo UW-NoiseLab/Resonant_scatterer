@@ -79,3 +79,34 @@ SiN_b_Zhihao = {
     'lambda_start': 550e-9,
     'lambda_stop': 700e-9,
 }
+
+
+Meta_TiO2_opt_a = {
+    'scatterer_scheme': "TiO2 on Top",
+    'period': 0.35e-6,
+    't_Al': 0.30e-6,
+    't_spacer': 0.05e-6,
+    't_LC': 0.50e-6,
+    't_ITO': 0.05e-6,
+    't_glass': 20e-6,
+    'r_scatter': 0.12e-6,
+    't_scatter': 0.25e-6,
+    'lambda_start': 550e-9,
+    'lambda_stop': 700e-9,
+}
+
+
+
+Meta_TiO2_opt_b = {
+    'scatterer_scheme': "TiO2 on Top",
+    'period': 0.35e-6,
+    't_Al': 0.30e-6,
+    't_spacer': 0.05e-6,
+    't_LC': 0.50e-6,
+    't_ITO': 0.05e-6,
+    't_glass': 20e-6,
+    'r_scatter': 0.135e-6,
+    't_scatter': 0.25e-6,
+    'lambda_start': 550e-9,
+    'lambda_stop': 700e-9,
+}

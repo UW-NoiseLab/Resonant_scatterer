@@ -60,7 +60,9 @@ lambda_start = 0.400e-6
 lambda_stop = 0.70e-6
 
 # 折射率扫描
-index_values = np.arange(1.55, 1.75, 0.01)
+index_start = 1.522
+index_stop = 1.813
+index_step = 0.005
 
 # 波长轴
 num_wave = 151
@@ -308,9 +310,9 @@ def main():
     parser.add_argument("--output-base", default=str(OUTPUT_BASE), help="Base directory for automatic scatterer namespaces")
     parser.add_argument("--num-wave", type=int, default=num_wave, help="Number of wavelength points")
     parser.add_argument("--max-retry", type=int, default=MAX_RETRY, help="Retry attempts per index")
-    parser.add_argument("--index-start", type=float, default=1.55, help="Start LC index")
-    parser.add_argument("--index-stop", type=float, default=1.75, help="Stop LC index")
-    parser.add_argument("--index-step", type=float, default=0.01, help="Step size for LC index")
+    parser.add_argument("--index-start", type=float, default=index_start, help="Start LC index")
+    parser.add_argument("--index-stop", type=float, default=index_stop, help="Stop LC index")
+    parser.add_argument("--index-step", type=float, default=index_step, help="Step size for LC index")
 
     args = parser.parse_args()
     
@@ -354,18 +356,24 @@ def overwrite_default_params(params: dict):
     
 if __name__ == "__main__":
     from archived_scatterer_params import SiN_b_565nm, SiN_t_490nm, ACSNano_TiO2_665nm, \
-    TiO2_t_Zhihao, SiN_b_Zhihao
+    TiO2_t_Zhihao, SiN_b_Zhihao, Meta_TiO2_opt_a, Meta_TiO2_opt_b
     # overwrite_default_params(SiN_t_490nm)
     # main()
     
     # overwrite_default_params(SiN_b_565nm)
     # main()
     
-    overwrite_default_params(ACSNano_TiO2_665nm)
-    main()
+    # overwrite_default_params(ACSNano_TiO2_665nm)
+    # main()
 
     # overwrite_default_params(TiO2_t_Zhihao)
     # main()
     
     # overwrite_default_params(SiN_b_Zhihao)
     # main()
+    
+    overwrite_default_params(Meta_TiO2_opt_a)
+    main()
+    
+    overwrite_default_params(Meta_TiO2_opt_b)
+    main()

@@ -22,16 +22,24 @@ LSF_FSP_FILE = r"./Grating_simulation.fsp"
 
 
 # 是否隐藏 Lumerical GUI
-HIDE_LUMERICAL = False
+HIDE_LUMERICAL = True
 
 
 # SCATTERER_SCHEME = "SiN on Bottom"
 # scatterer_data_folder = Path("./output_single_scatterer/scatterer_datas/SiN_on_Bottom_p360nm_r110nm_33522cb959")
 # grating_wavelength_nm = 564.0
 
-SCATTERER_SCHEME = "SiN on Top"
-scatterer_data_folder = Path("./output_single_scatterer/scatterer_datas/SiN_on_Top_p360nm_r120nm_b1aa3ddf81")
-grating_wavelength_nm = 490.0
+# SCATTERER_SCHEME = "SiN on Top"
+# scatterer_data_folder = Path("./output_single_scatterer/scatterer_datas/SiN_on_Top_p360nm_r120nm_b1aa3ddf81")
+# grating_wavelength_nm = 490.0
+
+SCATTERER_SCHEME = "TiO2 on Top"
+scatterer_data_folder = Path("./output_single_scatterer/scatterer_datas/TiO2_on_Top_p350nm_r135nm_da79e378a7")
+grating_wavelength_nm = 620.0
+
+# SCATTERER_SCHEME = "TiO2 on Top"
+# scatterer_data_folder = Path("./output_single_scatterer/scatterer_datas/TiO2_on_Top_p350nm_r120nm_0c21d26aea")
+# grating_wavelength_nm = 620.0
 
 
 # 输出根目录
@@ -85,64 +93,75 @@ def load_scatterer_config_and_data(data_folder, target_wavelength_nm):
 if __name__ == "__main__":
     result = load_scatterer_config_and_data(scatterer_data_folder, target_wavelength_nm=grating_wavelength_nm)
     grating_cells = 15
-    steering_angle_deg = 10
-    output_config = {
-        **result["config"],
-        "wavelength_nm": float(result["target_wavelength_nm"]),
-        "grating_cells": grating_cells,
-        "steering_angle_deg": steering_angle_deg,
-        "farfield_monitor": "R_monitor",
-    }
-    output_root = ensure_dir(build_grating_output_dir(OUTPUT_BASE, output_config))
-    
-    
-    # Save the generated LSF content
-    # save_lsf_file(result["lsf_content"], LSF_FSP_FILE.replace(".fsp", ".lsf"))
-    
-    print("\nGenerated LSF parameters:")
-    print(f"  Period: {result['config']['period']:.4e} m")
-    print(f"  Scatterer scheme: {result['config']['scatterer_scheme']}")
-    print(f"  Wavelength: {result['target_wavelength_nm']} nm")
-    print(f"  LC Index values: {len(result['lc_index_data'])} points")
-    print(f"  LC Phase data: {len(result['lc_phase_data'])} points")
-    
-    plt.figure(figsize=(6, 4))
-    plt.plot(result["lc_index_data"], np.array(result["lc_phase_data"]), marker='o')
-    plt.xlabel("LC Refractive Index")
-    plt.ylabel("Phase Delay (rad)")
-    plt.title(f"LC Phase vs Index at {result['target_wavelength_nm']} nm")
-    plt.grid(True)
-    lut_plot_path = output_root / f"lc_phase_vs_index_{int(result['target_wavelength_nm'])}nm.png"
-    plt.savefig(lut_plot_path, dpi=300)
-    print(f"Lookup table plot saved to: {os.path.abspath(lut_plot_path)}")
-    
-    fdtd = lumapi.FDTD(hide=HIDE_LUMERICAL)
-    
-    if os.path.exists(LSF_FSP_FILE):
-        fdtd.load(LSF_FSP_FILE)
+    steering_angle_deg = 5
+    for steering_angle_deg in range(0, 40, 2):  # Example: 0, 5, 10 degrees
+        output_config = {
+            **result["config"],
+            "wavelength_nm": float(result["target_wavelength_nm"]),
+            "grating_cells": grating_cells,
+            "steering_angle_deg": steering_angle_deg,
+            "farfield_monitor": "R_monitor",
+        }
+        
+        output_root = ensure_dir(build_grating_output_dir(OUTPUT_BASE, output_config))
+        output_root = Path(output_root) / f"steering_{steering_angle_deg}deg_grating_cells_{grating_cells}"
+        output_root = ensure_dir(output_root)
+        
+        if output_root.exists():
+            if (output_root / "farfield_data").exists():
+                if not any((output_root / "farfield_data").iterdir()):
+                    print(f"Empty output directory: {output_root}. Running simulation...")
+                else:
+                    print(f"Output directory already contains data: {output_root}. Skipping simulation.")
+                    continue
+        
+        # Save the generated LSF content
+        # save_lsf_file(result["lsf_content"], LSF_FSP_FILE.replace(".fsp", ".lsf"))
+        
+        print("\nGenerated LSF parameters:")
+        print(f"  Period: {result['config']['period']:.4e} m")
+        print(f"  Scatterer scheme: {result['config']['scatterer_scheme']}")
+        print(f"  Wavelength: {result['target_wavelength_nm']} nm")
+        print(f"  LC Index values: {len(result['lc_index_data'])} points")
+        print(f"  LC Phase data: {len(result['lc_phase_data'])} points")
+        
+        plt.figure(figsize=(6, 4))
+        plt.plot(result["lc_index_data"], np.array(result["lc_phase_data"]), marker='o')
+        plt.xlabel("LC Refractive Index")
+        plt.ylabel("Phase Delay (rad)")
+        plt.title(f"LC Phase vs Index at {result['target_wavelength_nm']} nm")
+        plt.grid(True)
+        lut_plot_path = output_root / f"lc_phase_vs_index_{int(result['target_wavelength_nm'])}nm.png"
+        plt.savefig(lut_plot_path, dpi=300)
+        print(f"Lookup table plot saved to: {os.path.abspath(lut_plot_path)}")
+        
+        fdtd = lumapi.FDTD(hide=HIDE_LUMERICAL)
+        
+        if os.path.exists(LSF_FSP_FILE):
+            fdtd.load(LSF_FSP_FILE)
 
-    lsf_code = result["lsf_content"]
+        lsf_code = result["lsf_content"]
 
-    if len(lsf_code.strip()) == 0:
-        raise ValueError(f"LSF code is empty: {lsf_code}")
+        if len(lsf_code.strip()) == 0:
+            raise ValueError(f"LSF code is empty: {lsf_code}")
 
-    print(f"[DEBUG] Successfully read LSF file ({len(lsf_code)} characters)")
-    fdtd.eval(lsf_code)
-    
-    fdtd.eval(f"createmodel({grating_cells},{steering_angle_deg});")
-    
+        print(f"[DEBUG] Successfully read LSF file ({len(lsf_code)} characters)")
+        fdtd.eval(lsf_code)
+        
+        fdtd.eval(f"createmodel({grating_cells},{steering_angle_deg});")
+        
 
-    fdtd.eval("run;")
+        fdtd.eval("run;")
 
-    target_wavelengths_nm = np.linspace(grating_wavelength_nm - 20, grating_wavelength_nm + 20, 5)  # Example: 5 wavelengths from 500nm to 600nm
-    target_wavelengths_m = [wl * 1e-9 for wl in target_wavelengths_nm]
+        target_wavelengths_nm = np.linspace(grating_wavelength_nm - 20, grating_wavelength_nm + 20, 5)  # Example: 5 wavelengths from 500nm to 600nm
+        target_wavelengths_m = [wl * 1e-9 for wl in target_wavelengths_nm]
 
-    farfield_results = save_farfield_data_multiple_wavelengths(
-        fdtd=fdtd,
-        monitor_name="R_monitor",
-        target_wavelengths_m=target_wavelengths_m,
-        output_dir=output_root / "farfield_data",
-        prefix="grating_farfield",
-        make_plot=True,
-    )
+        farfield_results = save_farfield_data_multiple_wavelengths(
+            fdtd=fdtd,
+            monitor_name="R_monitor",
+            target_wavelengths_m=target_wavelengths_m,
+            output_dir=output_root / "farfield_data",
+            prefix="grating_farfield",
+            make_plot=True,
+        )
 
