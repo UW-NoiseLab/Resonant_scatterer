@@ -43,6 +43,7 @@ DBR_MATERIAL_CHOICES = ("TiO2", "SiN")
 HIDE_LUMERICAL = True
 DBR_DESIGN_WAVELENGTH = 0.620e-6
 DBR_MATERIAL = "TiO2"
+DBR_PAIRS = 6
 ONLY_CREATE_MODEL = False
 
 t_Al = 0.30e-6
@@ -63,8 +64,7 @@ lambda_stop = 0.70e-6
 # 折射率扫描
 index_start = 1.522
 index_stop = 1.813
-index_step = 0.01
-
+index_step = 0.005
 # 波长轴
 num_wave = 151
 
@@ -95,13 +95,17 @@ def run_sweep(
     only_create_model=False,
     dbr_design_wavelength=DBR_DESIGN_WAVELENGTH,
     dbr_material=DBR_MATERIAL,
+    dbr_pairs=DBR_PAIRS,
 ):
     """Run the LC index sweep with configurable parameters."""
     lsf_fsp_file = Path(lsf_fsp_file)
     dbr_design_wavelength = float(dbr_design_wavelength)
+    dbr_pairs = int(dbr_pairs)
     if dbr_material not in DBR_MATERIAL_CHOICES:
         valid_materials = ", ".join(DBR_MATERIAL_CHOICES)
         raise ValueError(f"Unknown DBR material '{dbr_material}'. Valid materials: {valid_materials}")
+    if dbr_pairs <= 0:
+        raise ValueError(f"DBR pair count must be positive. Got: {dbr_pairs}")
 
     if index_values is None:
         index_values = np.arange(1.55, 1.75 + 1e-12, 0.01)
@@ -110,7 +114,7 @@ def run_sweep(
     wave_nm = np.linspace(lambda_start * 1e9, lambda_stop * 1e9, num_wave)  # Convert to nm for output
     n_index = len(index_values)
     n_wave = len(wave_nm)
-    dbr_scheme_name = f"DBR {dbr_material} {dbr_design_wavelength * 1e9:.0f}nm"
+    dbr_scheme_name = f"Pairs {dbr_pairs} DBR {dbr_material} {dbr_design_wavelength * 1e9:.0f}nm"
 
     namespace_config = {
         "lsf_fsp_file": str(lsf_fsp_file),
@@ -128,6 +132,7 @@ def run_sweep(
         "scatterer_scheme": dbr_scheme_name,
         "dbr_design_wavelength": float(dbr_design_wavelength),
         "dbr_material": dbr_material,
+        "dbr_pairs": int(dbr_pairs),
         "lambda_start": float(lambda_start),
         "lambda_stop": float(lambda_stop),
         "index_values": index_values.tolist(),
@@ -162,7 +167,7 @@ def run_sweep(
             raise FileNotFoundError(f"FSP file NOT found: {lsf_fsp_file}")
         fdtd.load(str(lsf_fsp_file))
 
-        lsf_code = scatter_DBR_lsf_gen(dbr_design_wavelength, dbr_material)
+        lsf_code = scatter_DBR_lsf_gen(dbr_design_wavelength, dbr_material, dbr_pairs)
 
         if len(lsf_code.strip()) == 0:
             raise ValueError(f"LSF code has error: {lsf_code}")
@@ -324,6 +329,7 @@ def main():
     parser.add_argument("--index-step", type=float, default=index_step, help="Step size for LC index")
     parser.add_argument("--dbr-wavelength", type=float, default=DBR_DESIGN_WAVELENGTH, help="DBR design wavelength in meters")
     parser.add_argument("--dbr-material", choices=DBR_MATERIAL_CHOICES, default=DBR_MATERIAL, help="High-index DBR material")
+    parser.add_argument("--dbr-pairs", type=int, default=DBR_PAIRS, help="Number of high/low DBR layer pairs")
 
     args = parser.parse_args()
     
@@ -337,6 +343,7 @@ def main():
         only_create_model=ONLY_CREATE_MODEL,
         dbr_design_wavelength=args.dbr_wavelength,
         dbr_material=args.dbr_material,
+        dbr_pairs=args.dbr_pairs,
         period=period,
         t_Al=t_Al,
         t_spacer=t_spacer,
@@ -351,9 +358,10 @@ def main():
 
 def overwrite_default_params(params: dict):
     """Overwrite default parameters with provided ones."""
-    global DBR_DESIGN_WAVELENGTH, DBR_MATERIAL, period, t_Al, t_spacer, t_LC, t_ITO, t_glass, r_scatter, t_scatter, lambda_start, lambda_stop, index_values, num_wave
+    global DBR_DESIGN_WAVELENGTH, DBR_MATERIAL, DBR_PAIRS, period, t_Al, t_spacer, t_LC, t_ITO, t_glass, r_scatter, t_scatter, lambda_start, lambda_stop, index_values, num_wave
     DBR_DESIGN_WAVELENGTH = params.get("dbr_design_wavelength", DBR_DESIGN_WAVELENGTH)
     DBR_MATERIAL = params.get("dbr_material", DBR_MATERIAL)
+    DBR_PAIRS = params.get("dbr_pairs", DBR_PAIRS)
     period = params.get("period", period)
     t_Al = params.get("t_Al", t_Al)
     t_spacer = params.get("t_spacer", t_spacer)
@@ -370,4 +378,14 @@ if __name__ == "__main__":
     from archived_scatterer_params import SiN_b_565nm, SiN_t_490nm, ACSNano_TiO2_665nm, \
     TiO2_t_Zhihao, SiN_b_Zhihao, Meta_TiO2_opt_a, Meta_TiO2_opt_b
     overwrite_default_params(Meta_TiO2_opt_a)
+    
+    DBR_PAIRS = 3
+    
     main()
+    
+
+    
+    # t_LC_list = [t_LC*ratio for ratio in [0.8, 0.9, 1.0, 1.1, 1.2, 1.3]]
+    # for t_LC in t_LC_list:
+    #     overwrite_default_params({"t_LC": t_LC})
+    #     main()

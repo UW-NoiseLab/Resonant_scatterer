@@ -698,6 +698,7 @@ def scatterer_lsf_gen(
 def scatter_DBR_lsf_gen(
     wavelength: float,
     material: Literal["TiO2", "SiN"] = "TiO2",
+    dbr_pairs: int = 6,
 ):
     """Generate an LC unit-cell script with a quarter-wave DBR above ITO.
 
@@ -715,6 +716,9 @@ def scatter_DBR_lsf_gen(
     wavelength = float(wavelength)
     if wavelength <= 0:
         raise ValueError(f"DBR wavelength must be positive. Got: {wavelength}")
+    dbr_pairs = int(dbr_pairs)
+    if dbr_pairs <= 0:
+        raise ValueError(f"DBR pair count must be positive. Got: {dbr_pairs}")
 
     dbr_config = _DBR_MATERIALS[material]
 
@@ -724,12 +728,13 @@ def scatter_DBR_lsf_gen(
         .replace("__DBR_MATERIAL__", dbr_config["material"])
         .replace("__DBR_INDEX__", f'{dbr_config["index"]:.16g}')
         .replace("__DBR_WAVELENGTH__", f"{wavelength:.16g}")
-        .replace("__DBR_PAIRS__", "6")
+        .replace("__DBR_PAIRS__", str(dbr_pairs))
     )
 
 
 def scatterer_DBR_lsf_gen(
     wavelength: float,
     material: Literal["TiO2", "SiN"] = "TiO2",
+    dbr_pairs: int = 6,
 ):
-    return scatter_DBR_lsf_gen(wavelength, material)
+    return scatter_DBR_lsf_gen(wavelength, material, dbr_pairs)

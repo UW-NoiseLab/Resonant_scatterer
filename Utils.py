@@ -936,7 +936,9 @@ def add_angle_accuracy(peak_result, target_theta_deg):
 
 if __name__ == "__main__":
     import argparse
-
+    visulization_dir = "output_single_grating/grating_datas_DBR/Pairs_2_DBR_TiO2_620nm_p350nm_r120nm_wavelength660nm_2155c068b4"
+    wavelength_nm = 660.0
+    
     parser = argparse.ArgumentParser(
         description="Plot a stacked far-field x-profile map across grating steering folders."
     )
@@ -944,8 +946,7 @@ if __name__ == "__main__":
         "grating_dir",
         nargs="?",
         default=(
-            "output_single_grating/grating_datas/"
-            "TiO2_on_Top_p350nm_r135nm_wavelength620nm_da79e378a7"
+            f"{visulization_dir}"
         ),
         help="Directory containing steering_* subfolders.",
     )
@@ -953,7 +954,7 @@ if __name__ == "__main__":
         "wavelength_nm",
         nargs="?",
         type=float,
-        default=620.0,
+        default=wavelength_nm,
         help="Target wavelength in nm.",
     )
     parser.add_argument(
