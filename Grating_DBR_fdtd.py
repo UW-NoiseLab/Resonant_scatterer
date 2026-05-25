@@ -32,9 +32,13 @@ DBR_PAIRS = 6
 scatterer_data_folder = Path("./output_single_scatterer/scatterer_datas_DBR/Pairs_2_DBR_TiO2_620nm_p350nm_r120nm_2155c068b4")
 grating_wavelength_nm = 660.0
 
+SOURCE_POLARIZATION = "y"  # "x" or "y", x is the direction of gradient structure, y is perpendicular to the gradient structure
 
 # 输出根目录
-OUTPUT_BASE = Path("output_single_grating/grating_datas_DBR")
+if SOURCE_POLARIZATION == "x":
+    OUTPUT_BASE = Path("output_single_grating/grating_datas_DBR")
+else:
+    OUTPUT_BASE = Path("output_single_grating/grating_datas_DBR_y_polarization")
 
 
 def dbr_scatterer_scheme(material, wavelength, dbr_pairs):
@@ -188,7 +192,11 @@ if __name__ == "__main__":
         
         fdtd.eval(f"createmodel({grating_cells},{steering_angle_deg});")
         
-
+        if SOURCE_POLARIZATION == "x":
+            pass
+        elif SOURCE_POLARIZATION == "y":
+            fdtd.eval("setnamed('source', 'polarization angle', 90);")
+        
         fdtd.eval("run;")
 
         target_wavelengths_nm = np.linspace(grating_wavelength_nm - 20, grating_wavelength_nm + 20, 5)  # Example: 5 wavelengths from 500nm to 600nm

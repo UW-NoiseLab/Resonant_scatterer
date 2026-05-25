@@ -379,7 +379,7 @@ if __name__ == "__main__":
     TiO2_t_Zhihao, SiN_b_Zhihao, Meta_TiO2_opt_a, Meta_TiO2_opt_b
     overwrite_default_params(Meta_TiO2_opt_a)
     
-    DBR_PAIRS = 3
+    DBR_PAIRS = 2
     
     main()
     

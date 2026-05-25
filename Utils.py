@@ -548,6 +548,63 @@ def _closest_farfield_x_profile_csv(farfield_dir, target_wavelength_nm):
     return csv_path, wavelength_nm
 
 
+def _trapz_integral(y, x):
+    """Compatibility wrapper for trapezoidal integration across NumPy versions."""
+    if hasattr(np, "trapezoid"):
+        return np.trapezoid(y, x)
+    return np.trapz(y, x)
+
+
+def _integrate_theta_window(theta_deg, intensity, lower_deg, upper_deg):
+    """Integrate intensity over a clipped angular window with interpolated edges."""
+    lower_deg = max(float(lower_deg), float(theta_deg[0]))
+    upper_deg = min(float(upper_deg), float(theta_deg[-1]))
+    if upper_deg <= lower_deg:
+        return 0.0
+
+    inside = (theta_deg > lower_deg) & (theta_deg < upper_deg)
+    window_theta = np.concatenate(
+        [[lower_deg], theta_deg[inside], [upper_deg]]
+    )
+    window_intensity = np.interp(window_theta, theta_deg, intensity)
+    return float(_trapz_integral(window_intensity, window_theta))
+
+
+def beam_steering_efficiency(theta_deg, intensity, target_theta_deg, half_width_deg):
+    """
+    Integrate the far-field power fraction inside target_theta_deg +/- half_width_deg.
+    """
+    theta_deg = np.asarray(theta_deg, dtype=float).ravel()
+    intensity = np.asarray(intensity, dtype=float).ravel()
+    if theta_deg.size != intensity.size:
+        raise ValueError("theta_deg and intensity must have the same length.")
+    if theta_deg.size < 2:
+        return np.nan
+
+    valid = np.isfinite(theta_deg) & np.isfinite(intensity)
+    theta_deg = theta_deg[valid]
+    intensity = intensity[valid]
+    if theta_deg.size < 2:
+        return np.nan
+
+    order = np.argsort(theta_deg)
+    theta_deg = theta_deg[order]
+    intensity = intensity[order]
+    intensity = np.clip(intensity, 0.0, None)
+
+    total_power = _trapz_integral(intensity, theta_deg)
+    if total_power <= 0:
+        return np.nan
+
+    main_lobe_power = _integrate_theta_window(
+        theta_deg,
+        intensity,
+        float(target_theta_deg) - float(half_width_deg),
+        float(target_theta_deg) + float(half_width_deg),
+    )
+    return float(main_lobe_power / total_power)
+
+
 def plot_grating_farfield_steering_map(
     grating_dir,
     wavelength_nm,
@@ -555,6 +612,7 @@ def plot_grating_farfield_steering_map(
     air_refractive_index=1.0,
     output_file=None,
     save_matrix=True,
+    main_lobe_half_width_deg=1.0,
 ):
     """
     Stack each steering subfolder's nearest wavelength x-profile into a 2D map.
@@ -626,6 +684,17 @@ def plot_grating_farfield_steering_map(
     air_valid_mask = np.abs(sin_theta_air) <= 1.0
     theta_x_air_deg = np.rad2deg(np.arcsin(sin_theta_air[air_valid_mask]))
     intensity_map_air = intensity_map[:, air_valid_mask]
+    steering_efficiency = np.array(
+        [
+            beam_steering_efficiency(
+                theta_x_air_deg,
+                intensity_map_air[row_idx, :],
+                steering_angle_deg,
+                main_lobe_half_width_deg,
+            )
+            for row_idx, steering_angle_deg in enumerate(steering_angles_deg)
+        ]
+    )
 
     if output_file is None:
         wl_tag = wavelength_tag(wavelength_nm, prefix="", decimals=1)
@@ -654,8 +723,35 @@ def plot_grating_farfield_steering_map(
             output_file.with_name(output_file.stem + "_steering_angles_deg.npy"),
             steering_angles_deg,
         )
+        np.save(
+            output_file.with_name(output_file.stem + "_steering_efficiency.npy"),
+            steering_efficiency,
+        )
+        np.savetxt(
+            output_file.with_name(output_file.stem + "_steering_efficiency.txt"),
+            steering_efficiency,
+            fmt="%.10g",
+            header=(
+                "Beam steering efficiency for each row in "
+                f"{output_file.stem}_steering_angles_deg.npy; "
+                f"main_lobe_half_width_deg={float(main_lobe_half_width_deg):g}"
+            ),
+        )
+        np.savetxt(
+            output_file.with_name(output_file.stem + "_steering_efficiency_table.txt"),
+            np.column_stack([steering_angles_deg, steering_efficiency]),
+            fmt=["%.10g", "%.10g"],
+            header=(
+                "steering_angle_deg beam_steering_efficiency "
+                f"main_lobe_half_width_deg={float(main_lobe_half_width_deg):g}"
+            ),
+        )
 
     print(f"Saved far-field steering map to: {output_file}")
+    print(
+        "Saved beam steering efficiency to: "
+        f"{output_file.with_name(output_file.stem + '_steering_efficiency.txt')}"
+    )
     return {
         "output_file": str(output_file),
         "theta_x_air_deg": theta_x_air_deg,
@@ -663,6 +759,8 @@ def plot_grating_farfield_steering_map(
         "steering_angles_deg": steering_angles_deg,
         "actual_wavelengths_nm": actual_wavelengths_nm,
         "intensity_map": intensity_map_air,
+        "steering_efficiency": steering_efficiency,
+        "main_lobe_half_width_deg": float(main_lobe_half_width_deg),
         "glass_refractive_index": float(glass_refractive_index),
         "air_refractive_index": float(air_refractive_index),
         "source_files": [str(row["csv_path"]) for row in rows],
@@ -939,6 +1037,9 @@ if __name__ == "__main__":
     visulization_dir = "output_single_grating/grating_datas_DBR/Pairs_2_DBR_TiO2_620nm_p350nm_r120nm_wavelength660nm_2155c068b4"
     wavelength_nm = 660.0
     
+    # visulization_dir = "output_single_grating/grating_datas/TiO2_on_Top_p350nm_r120nm_wavelength620nm_0c21d26aea"
+    # wavelength_nm = 620.0
+    
     parser = argparse.ArgumentParser(
         description="Plot a stacked far-field x-profile map across grating steering folders."
     )
@@ -969,6 +1070,12 @@ if __name__ == "__main__":
         default=None,
         help="Optional output PNG path. Defaults inside grating_dir.",
     )
+    parser.add_argument(
+        "--main-lobe-half-width-deg",
+        type=float,
+        default=5.0,
+        help="Delta theta in degrees for beam steering efficiency integration.",
+    )
     args = parser.parse_args()
 
     plot_grating_farfield_steering_map(
@@ -976,4 +1083,5 @@ if __name__ == "__main__":
         wavelength_nm=args.wavelength_nm,
         glass_refractive_index=args.glass_refractive_index,
         output_file=args.output_file,
+        main_lobe_half_width_deg=args.main_lobe_half_width_deg,
     )
