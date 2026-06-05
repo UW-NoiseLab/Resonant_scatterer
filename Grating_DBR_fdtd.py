@@ -32,11 +32,11 @@ DBR_PAIRS = 6
 scatterer_data_folder = Path("./output_single_scatterer/scatterer_datas_DBR/Pairs_2_DBR_TiO2_620nm_p350nm_r120nm_2155c068b4")
 grating_wavelength_nm = 660.0
 
-SOURCE_POLARIZATION = "y"  # "x" or "y", x is the direction of gradient structure, y is perpendicular to the gradient structure
+SOURCE_POLARIZATION = "x"  # "x" or "y", x is the direction of gradient structure, y is perpendicular to the gradient structure
 
 # 输出根目录
 if SOURCE_POLARIZATION == "x":
-    OUTPUT_BASE = Path("output_single_grating/grating_datas_DBR")
+    OUTPUT_BASE = Path("output_single_grating/grating_datas_DBR_farfield_index3")
 else:
     OUTPUT_BASE = Path("output_single_grating/grating_datas_DBR_y_polarization")
 
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     result = load_scatterer_config_and_data(scatterer_data_folder, target_wavelength_nm=grating_wavelength_nm)
     grating_cells = 15
     steering_angle_deg = 5
-    for steering_angle_deg in range(0, 40, 2):  # Example: 0, 5, 10 degrees
+    for steering_angle_deg in range(0, 26, 1):  # Example: 0, 5, 10 degrees
         output_config = {
             **result["config"],
             "wavelength_nm": float(result["target_wavelength_nm"]),

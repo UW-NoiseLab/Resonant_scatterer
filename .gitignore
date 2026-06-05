@@ -8,3 +8,6 @@
 
 !LC_simulation.fsp
 !Grating_simulation.fsp
+
+!LC_simulation_DBR.fsp
+!Grating_simulation_DBR.fsp
